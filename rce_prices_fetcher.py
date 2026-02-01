@@ -1,9 +1,7 @@
 import appdaemon.plugins.hass.hassapi as hass
-
 import logging
-import signal
-import sys
-from datetime import date, timedelta, datetime
+import os
+from datetime import date, timedelta, datetime, time
 
 import requests
 import pymysql
@@ -16,23 +14,30 @@ class RCEPricesFetcher(hass.Hass):
         self.db_cfg = self.args["db"]
         self.api_cfg = self.args["api"]
         self.log_cfg = self.args["logging"]
-
         self.table = self.db_cfg["table"]
-
+    
         self.logger = self._setup_utf8_logger(self.log_cfg["file"])
-
         self.logger.info("=== RCEPricesFetcher uruchomiony ===")
-
-        signal.signal(signal.SIGTERM, self._signal_handler)
-
-        # Jednorazowe uruchomienie po starcie AppDaemon
-        self.run_in(self.run_job, 1)
+    
+        # --- harmonogram dzienny z apps.yaml ---
+        schedule_cfg = self.args.get("schedule", {})
+        run_hour = schedule_cfg.get("hour", 14)
+        run_minute = schedule_cfg.get("minute", 35)
+    
+        run_time = time(hour=run_hour, minute=run_minute)
+        self.run_daily(self.run_job, run_time)
+        self.logger.info(f"Harmonogram dzienny ustawiony: {run_hour:02d}:{run_minute:02d}")
 
     # ---------------------------------------------------------------------
 
     def _setup_utf8_logger(self, logfile):
         logger = logging.getLogger("rce_prices_fetcher")
         logger.setLevel(logging.INFO)
+
+        # Tworzenie katalogu jeśli nie istnieje
+        log_dir = os.path.dirname(logfile)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
 
         if not logger.handlers:
             handler = logging.FileHandler(logfile, encoding="utf-8")
@@ -43,20 +48,6 @@ class RCEPricesFetcher(hass.Hass):
             logger.addHandler(handler)
 
         return logger
-
-    # ---------------------------------------------------------------------
-
-    def _signal_handler(self, sig, frame):
-        self.logger.warning(
-            "Otrzymano SIGTERM (timeout / restart AppDaemon) – kończę bezpiecznie"
-        )
-        if hasattr(self, "connection") and self.connection:
-            try:
-                self.connection.commit()
-                self.logger.info("Ostatni commit wykonany")
-            except Exception as e:
-                self.logger.error(f"Błąd commit przy SIGTERM: {e}")
-        sys.exit(0)
 
     # ---------------------------------------------------------------------
 
@@ -120,7 +111,6 @@ class RCEPricesFetcher(hass.Hass):
 
     def _insert_data(self, cursor, data):
         inserted = 0
-
         for item in data:
             try:
                 cursor.execute(
@@ -143,7 +133,7 @@ class RCEPricesFetcher(hass.Hass):
                 )
                 inserted += cursor.rowcount
             except Exception as e:
-                self.logger.error(f"Błąd zapisu rekordu: {e}")
+                self.logger.error(f"Błąd zapisu rekordu: {e} | {item}")
 
         self.connection.commit()
         self.logger.info(f"Zapisano {inserted} nowych rekordów")
@@ -193,9 +183,7 @@ class RCEPricesFetcher(hass.Hass):
                     f"Tabela istnieje – pobieram od {start} do {tomorrow}"
                 )
 
-            for i, d in enumerate(
-                self._date_range(start, tomorrow), 1
-            ):
+            for i, d in enumerate(self._date_range(start, tomorrow), 1):
                 self.logger.info(f"[{i}] Pobieranie {d}")
                 data = self._fetch_rce(d)
                 if data:
