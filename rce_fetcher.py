@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import hassapi as hass
 import requests
 import pymysql
