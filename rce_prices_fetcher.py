@@ -11,19 +11,20 @@ from pymysql.err import ProgrammingError
 class RCEPricesFetcher(hass.Hass):
 
     def initialize(self):
-        self.db_cfg = self.args["db"]
-        self.api_cfg = self.args["api"]
-        self.log_cfg = self.args["logging"]
-        self.table = self.db_cfg["table"]
-    
-        self.logger = self._setup_utf8_logger(self.log_cfg["file"])
+        # --- konfiguracja ---
+        self.db_cfg = self.args.get("db", {})
+        self.api_cfg = self.args.get("api", {})
+        self.log_cfg = self.args.get("logging", {})
+        self.table = self.db_cfg.get("table", "rce_prices")
+
+        # --- logger UTF-8 ---
+        self.logger = self._setup_utf8_logger(self.log_cfg.get("file", "/config/appdaemon/logs/rce_fetch_utf8.log"))
         self.logger.info("=== RCEPricesFetcher uruchomiony ===")
-    
-        # --- harmonogram dzienny z apps.yaml ---
+
+        # --- harmonogram dzienny ---
         schedule_cfg = self.args.get("schedule", {})
         run_hour = schedule_cfg.get("hour", 14)
         run_minute = schedule_cfg.get("minute", 35)
-    
         run_time = time(hour=run_hour, minute=run_minute)
         self.run_daily(self.run_job, run_time)
         self.logger.info(f"Harmonogram dzienny ustawiony: {run_hour:02d}:{run_minute:02d}")
@@ -53,10 +54,10 @@ class RCEPricesFetcher(hass.Hass):
 
     def _connect_db(self):
         return pymysql.connect(
-            host=self.db_cfg["host"],
-            user=self.db_cfg["user"],
-            password=self.db_cfg["password"],
-            db=self.db_cfg["name"],
+            host=self.db_cfg.get("host", "core-mariadb"),
+            user=self.db_cfg.get("user", "homeassistant"),
+            password=self.db_cfg.get("password", ""),
+            db=self.db_cfg.get("name", "homeassistant"),
             charset="utf8mb4",
             autocommit=False,
         )
@@ -93,7 +94,7 @@ class RCEPricesFetcher(hass.Hass):
 
     def _fetch_rce(self, date_str):
         url = (
-            f"{self.api_cfg['base_url']}"
+            f"{self.api_cfg.get('base_url', '')}"
             f"?%24filter=business_date%20eq%20%27{date_str}%27"
         )
 
@@ -121,14 +122,14 @@ class RCEPricesFetcher(hass.Hass):
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
-                        item["dtime_utc"],
-                        item["period_utc"],
-                        item["dtime"],
-                        item["period"],
-                        item["rce_pln"],
-                        item["business_date"],
-                        item["publication_ts_utc"],
-                        item["publication_ts"],
+                        item.get("dtime_utc"),
+                        item.get("period_utc"),
+                        item.get("dtime"),
+                        item.get("period"),
+                        item.get("rce_pln"),
+                        item.get("business_date"),
+                        item.get("publication_ts_utc"),
+                        item.get("publication_ts"),
                     ),
                 )
                 inserted += cursor.rowcount
@@ -162,26 +163,20 @@ class RCEPricesFetcher(hass.Hass):
                 self._create_table(cursor)
                 self.connection.commit()
                 start = datetime.strptime(
-                    self.api_cfg["start_date_if_new"], "%Y-%m-%d"
+                    self.api_cfg.get("start_date_if_new", "2024-06-14"), "%Y-%m-%d"
                 ).date()
-                self.logger.info(
-                    f"Nowa tabela – pobieram od {start} do {tomorrow}"
-                )
+                self.logger.info(f"Nowa tabela – pobieram od {start} do {tomorrow}")
             else:
-                cursor.execute(
-                    f"SELECT MAX(business_date) FROM {self.table}"
-                )
+                cursor.execute(f"SELECT MAX(business_date) FROM {self.table}")
                 max_bd = cursor.fetchone()[0]
                 if max_bd:
                     start = max_bd - timedelta(days=3)
                 else:
                     start = datetime.strptime(
-                        self.api_cfg["start_date_if_new"], "%Y-%m-%d"
+                        self.api_cfg.get("start_date_if_new", "2024-06-14"), "%Y-%m-%d"
                     ).date()
 
-                self.logger.info(
-                    f"Tabela istnieje – pobieram od {start} do {tomorrow}"
-                )
+                self.logger.info(f"Tabela istnieje – pobieram od {start} do {tomorrow}")
 
             for i, d in enumerate(self._date_range(start, tomorrow), 1):
                 self.logger.info(f"[{i}] Pobieranie {d}")
