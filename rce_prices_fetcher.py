@@ -17,7 +17,7 @@ class RCEPricesFetcher(hass.Hass):
         self.table = self.db_cfg.get("table", "rce_prices")
 
         # --- logger UTF-8 ---
-        default_logfile = "/config/appdaemon/logs/rce_fetch_utf8.log"
+        default_logfile = "/config/logs/rce_prices_fetcher.log"
         self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
         self.logger.info("=== RCEPricesFetcher uruchomiony ===")
         self.logger.info("=== Test UTF-8: ąćęłńóśźż ===")
