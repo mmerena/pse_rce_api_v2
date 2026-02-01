@@ -1,6 +1,6 @@
-Struktura plików (w /config/appdaemon/)
+Struktura plików:
 ```text
-/config/appdaemon/
+/addon_configs/a0d7b954_appdaemon/
 ├── apps/
 │   └── rce_prices_fetcher.py
 ├── apps.yaml
@@ -10,6 +10,7 @@ Struktura plików (w /config/appdaemon/)
 
 apps.yaml
 ```yaml
+---
 rce_prices_fetcher:
   module: rce_prices_fetcher
   class: RCEPricesFetcher
@@ -26,5 +27,5 @@ rce_prices_fetcher:
     start_date_if_new: "2024-06-14"
 
   logging:
-    file: /config/appdaemon/logs/rce_fetch_utf8.log
+    file: /addon_configs/a0d7b954_appdaemon/logs/rce_fetch_utf8.log
 ```
