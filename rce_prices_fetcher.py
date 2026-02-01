@@ -14,16 +14,13 @@ class RCEPricesFetcher(hass.Hass):
         # --- konfiguracja ---
         self.db_cfg = self.args.get("db", {})
         self.api_cfg = self.args.get("api", {})
-        self.log_cfg = self.args.get("logging", {})
         self.table = self.db_cfg.get("table", "rce_prices")
 
         # --- logger UTF-8 ---
-        self.logger = self._setup_utf8_logger(
-            self.log_cfg.get(
-                "file", "/config/appdaemon/logs/rce_fetch_utf8.log"
-            )
-        )
+        default_logfile = "/config/appdaemon/logs/rce_fetch_utf8.log"
+        self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
         self.logger.info("=== RCEPricesFetcher uruchomiony ===")
+        self.logger.info("=== Test UTF-8: ąćęłńóśźż ===")
 
         # --- harmonogram dzienny ---
         schedule_cfg = self.args.get("schedule", {})
@@ -43,6 +40,7 @@ class RCEPricesFetcher(hass.Hass):
         logger = logging.getLogger("rce_prices_fetcher")
         logger.setLevel(logging.INFO)
 
+        # Tworzymy katalog jeśli nie istnieje
         log_dir = os.path.dirname(logfile)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
