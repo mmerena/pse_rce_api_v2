@@ -5,7 +5,7 @@ Struktura plików:
 │   └── rce_prices_fetcher.py
 ├── apps.yaml
 ├── logs/
-│   └── rce_fetch_utf8.log
+│   └── rce_prices_fetcher.log
 ```
 
 apps.yaml
