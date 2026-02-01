@@ -59,5 +59,6 @@ tap_action:
   service: fetch_rce_manual
 name: Pobierz RCE teraz
 icon: mdi:flash
+show_state: false
 ```
 
