@@ -243,7 +243,8 @@ SELECT
 FROM dates
 WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
 
-) g13;
+) g13
+ORDER BY 1 DESC;
 
 -- ---------------------------------------------------------
 --
@@ -303,7 +304,8 @@ SELECT
 FROM dates
 WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
 
-) g12w;
+) g12w
+ORDER BY 1 DESC;
 
 -- ---------------------------------------------------------
 -- TAUROG G12
@@ -357,7 +359,8 @@ SELECT
     'T1 -> T2' AS `text`
 FROM dates
 
-) g12;
+) g12
+ORDER BY 1 DESC;
 ```
 
 Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> Forecast.Solar
