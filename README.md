@@ -1,6 +1,6 @@
 Ustawienia -> Dodatki -> Sklep z dodatkami -> File editor
-# -> Zainstaluj
-# -> Konfiguracja
+ -> Zainstaluj
+ -> Konfiguracja
 
 ```yaml
 dirsfirst: true
