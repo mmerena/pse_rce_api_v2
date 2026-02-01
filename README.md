@@ -35,9 +35,6 @@ rights:
       - SELECT
 ```
 
-Ustawienia -> Dodatki -> Sklep z dodatkami -> phpMyAdmin
- -> Zainstaluj
-
 Ustawienia -> Dodatki -> Sklep z dodatkami -> AppDaemon
  -> Zainstaluj
  -> Konfiguracja
@@ -93,3 +90,259 @@ mariadb_user: homeassistant
 mariadb_password: ****************
 ```
 
+Ustawienia -> Dodatki -> Sklep z dodatkami -> phpMyAdmin
+ -> Zainstaluj
+```sql
+DELIMITER $$
+
+CREATE OR REPLACE FUNCTION tz_warsaw_to_utc(local_dt DATETIME)
+RETURNS DATETIME
+DETERMINISTIC
+BEGIN
+    DECLARE y INT;
+    DECLARE dst_start DATETIME;
+    DECLARE dst_end DATETIME;
+
+    SET y = YEAR(local_dt);
+
+    -- DST start: ostatnia niedziela marca, 02:00 lokalnie (CEST)
+    SET dst_start = DATE_ADD(
+        DATE_SUB(
+            DATE_ADD(MAKEDATE(y,1), INTERVAL 3 MONTH) - INTERVAL 1 DAY,
+            INTERVAL (DAYOFWEEK(DATE_ADD(MAKEDATE(y,1), INTERVAL 3 MONTH) - INTERVAL 1 DAY) - 1) DAY
+        ),
+        INTERVAL 2 HOUR
+    );
+
+    -- DST end: ostatnia niedziela października, 03:00 lokalnie (CET)
+    SET dst_end = DATE_ADD(
+        DATE_SUB(
+            DATE_ADD(MAKEDATE(y,1), INTERVAL 10 MONTH) - INTERVAL 1 DAY,
+            INTERVAL (DAYOFWEEK(DATE_ADD(MAKEDATE(y,1), INTERVAL 10 MONTH) - INTERVAL 1 DAY) - 1) DAY
+        ),
+        INTERVAL 3 HOUR
+    );
+
+    -- Jeśli data w okresie DST (CEST), odejmujemy 2 godziny
+    IF local_dt >= dst_start AND local_dt < dst_end THEN
+        RETURN local_dt - INTERVAL 2 HOUR;
+    ELSE
+        -- Pozostałe godziny: CET, odejmujemy 1 godzinę
+        RETURN local_dt - INTERVAL 1 HOUR;
+    END IF;
+END$$
+
+DELIMITER ;
+
+-----------------------------------------------------------
+
+DELIMITER $$
+
+CREATE OR REPLACE FUNCTION tz_utc_to_warsaw(utc_dt DATETIME)
+RETURNS DATETIME
+DETERMINISTIC
+BEGIN
+    DECLARE y INT;
+    DECLARE dst_start DATETIME;
+    DECLARE dst_end DATETIME;
+
+    SET y = YEAR(utc_dt);
+
+    -- DST start: ostatnia niedziela marca 02:00 lokalnie → 01:00 UTC
+    SET dst_start = DATE_ADD(
+        DATE_SUB(
+            DATE_ADD(MAKEDATE(y,1), INTERVAL 3 MONTH) - INTERVAL 1 DAY,
+            INTERVAL (DAYOFWEEK(DATE_ADD(MAKEDATE(y,1), INTERVAL 3 MONTH) - INTERVAL 1 DAY) - 1) DAY
+        ),
+        INTERVAL 1 HOUR
+    );
+
+    -- DST end: ostatnia niedziela października 03:00 lokalnie → 02:00 UTC
+    SET dst_end = DATE_ADD(
+        DATE_SUB(
+            DATE_ADD(MAKEDATE(y,1), INTERVAL 10 MONTH) - INTERVAL 1 DAY,
+            INTERVAL (DAYOFWEEK(DATE_ADD(MAKEDATE(y,1), INTERVAL 10 MONTH) - INTERVAL 1 DAY) - 1) DAY
+        ),
+        INTERVAL 2 HOUR
+    );
+
+    -- Jeśli UTC w okresie DST, dodajemy 2 godziny
+    IF utc_dt >= dst_start AND utc_dt < dst_end THEN
+        RETURN utc_dt + INTERVAL 2 HOUR;
+    ELSE
+        -- Pozostałe godziny: CET, dodajemy 1 godzinę
+        RETURN utc_dt + INTERVAL 1 HOUR;
+    END IF;
+END$$
+
+DELIMITER ;
+
+-----------------------------------------------------------
+--
+-- TAURON G13
+--
+-- Taryfa G13 – taryfa przedpołudniowa (średnia cena) w godzinach 7:00 – 13:00, taryfa popołudniowa (najwyższa cena)
+-- latem w godzinach 19:00 – 22:00, zimą w godzinach 16:00 – 21:00, pozostałe godziny (najniższa cena)
+-- latem 13:00 – 19:00 oraz 22:00 – 7:00, zimą 13:00 – 16:00 oraz 21:00 – 7:00, a także weekendy.
+--
+
+WITH RECURSIVE dates AS (
+    SELECT DATE_SUB(CURDATE(), INTERVAL 180 DAY) AS `date`
+    UNION ALL
+    SELECT DATE_ADD(`date`, INTERVAL 1 DAY)
+    FROM dates
+    WHERE `date` < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+)
+
+-- 7:00 i 13:00 (czasu polskiego)
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 7 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 7 HOUR) AS time,
+    '07:00' AS `title`,
+    'T3 -> T1' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+UNION ALL
+
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 13 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 13 HOUR) AS time,
+    '13:00' AS `title`,
+    'T1 -> T3' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+UNION ALL
+
+-- 19:00 (lato) / 16:00 (zima)
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL IF(MONTH(`date`) BETWEEN 4 AND 9, 19, 16) HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL IF(MONTH(`date`) BETWEEN 4 AND 9, 19, 16) HOUR) AS time,
+    CONCAT(LPAD(IF(MONTH(`date`) BETWEEN 4 AND 9, 19, 16), 2, '0'), ':00') AS `title`,
+    'T3 -> T2' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+UNION ALL
+
+-- 22:00 (lato) / 21:00 (zima)
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL IF(MONTH(`date`) BETWEEN 4 AND 9, 22, 21) HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL IF(MONTH(`date`) BETWEEN 4 AND 9, 22, 21) HOUR) AS time,
+    CONCAT(LPAD(IF(MONTH(`date`) BETWEEN 4 AND 9, 22, 21), 2, '0'), ':00') AS `title`,
+    'T2 -> T3' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+ORDER BY time_utc;
+
+-----------------------------------------------------------
+--
+-- TAURON G12w
+--
+-- Taryfa G12w – tańsza energia elektryczna w ciągu dnia w godzinach 13:00 – 15:00 oraz 22:00 – 6:00
+-- oraz w weekendy i w dniach ustawowo wolnych od pracy.
+--
+
+WITH RECURSIVE dates AS (
+    SELECT DATE_SUB(CURDATE(), INTERVAL 180 DAY) AS `date`
+    UNION ALL
+    SELECT DATE_ADD(`date`, INTERVAL 1 DAY)
+    FROM dates
+    WHERE `date` < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+)
+
+-- 6:00, 13:00, 15:00, 22:00 (czasu polskiego)
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 6 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 6 HOUR) AS time,
+    '06:00' AS `title`,
+    'T2 -> T1' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+UNION ALL
+
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 13 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 13 HOUR) AS time,
+    '13:00' AS `title`,
+    'T1 -> T2' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+UNION ALL
+
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 15 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 15 HOUR) AS time,
+    '15:00' AS `title`,
+    'T2 -> T1' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+UNION ALL
+
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 22 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 22 HOUR) AS time,
+    '22:00' AS `title`,
+    'T1 -> T2' AS `text`
+FROM dates
+WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
+
+ORDER BY time_utc;
+
+-----------------------------------------------------------
+-- TAUROG G12
+--
+-- Taryfa G12 – tańsza energia elektryczna w ciągu dnia w godzinach 13:00 – 15:00 oraz 22:00 – 6:00.
+--
+
+WITH RECURSIVE dates AS (
+    SELECT DATE_SUB(CURDATE(), INTERVAL 180 DAY) AS `date`
+    UNION ALL
+    SELECT DATE_ADD(`date`, INTERVAL 1 DAY)
+    FROM dates
+    WHERE `date` < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+)
+
+-- 6:00, 13:00, 15:00, 22:00 (czasu polskiego)
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 6 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 6 HOUR) AS time,
+    '06:00' AS `title`,
+    'T2 -> T1' AS `text`
+FROM dates
+
+UNION ALL
+
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 13 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 13 HOUR) AS time,
+    '13:00' AS `title`,
+    'T1 -> T2' AS `text`
+FROM dates
+
+UNION ALL
+
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 15 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 15 HOUR) AS time,
+    '15:00' AS `title`,
+    'T2 -> T1' AS `text`
+FROM dates
+
+UNION ALL
+
+SELECT 
+    UNIX_TIMESTAMP(tz_warsaw_to_utc(`date` + INTERVAL 22 HOUR)) AS time_utc,
+    UNIX_TIMESTAMP(`date` + INTERVAL 22 HOUR) AS time,
+    '22:00' AS `title`,
+    'T1 -> T2' AS `text`
+FROM dates
+
+ORDER BY time_utc;
+```
+ 
