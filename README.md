@@ -28,4 +28,8 @@ rce_prices_fetcher:
 
   logging:
     file: /addon_configs/a0d7b954_appdaemon/logs/rce_fetch_utf8.log
+
+  schedule:
+    hour: 14
+    minute: 35
 ```
