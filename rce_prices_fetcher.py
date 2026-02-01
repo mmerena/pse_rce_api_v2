@@ -19,8 +19,7 @@ class RCEPricesFetcher(hass.Hass):
         # --- logger UTF-8 ---
         default_logfile = "/config/logs/rce_prices_fetcher.log"
         self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
-        self.logger.info("=== RCEPricesFetcher uruchomiony ===")
-        self.logger.info("=== Test UTF-8: ąćęłńóśźż ===")
+        self.logger.info("=== RCE Prices Fetcher został uruchomiony ===")
 
         # --- harmonogram dzienny ---
         schedule_cfg = self.args.get("schedule", {})
@@ -135,70 +134,4 @@ class RCEPricesFetcher(hass.Hass):
                         item.get("publication_ts"),
                     ),
                 )
-                inserted += cursor.rowcount
-            except Exception as e:
-                self.logger.error(f"Błąd zapisu rekordu: {e} | {item}")
-
-        self.connection.commit()
-        self.logger.info(f"Zapisano {inserted} nowych rekordów")
-
-    # ---------------------------------------------------------------------
-
-    def _date_range(self, start, end):
-        cur = start
-        while cur <= end:
-            yield cur.strftime("%Y-%m-%d")
-            cur += timedelta(days=1)
-
-    # ---------------------------------------------------------------------
-
-    def run_job(self, kwargs=None):
-        self.connection = None
-        cursor = None
-
-        try:
-            self.connection = self._connect_db()
-            cursor = self.connection.cursor()
-
-            tomorrow = date.today() + timedelta(days=1)
-
-            if not self._table_exists(cursor):
-                self._create_table(cursor)
-                self.connection.commit()
-                start = datetime.strptime(
-                    self.api_cfg.get("start_date_if_new", "2024-06-14"), "%Y-%m-%d"
-                ).date()
-                self.logger.info(f"Nowa tabela – pobieram od {start} do {tomorrow}")
-            else:
-                cursor.execute(f"SELECT MAX(business_date) FROM {self.table}")
-                max_bd = cursor.fetchone()[0]
-                if max_bd:
-                    start = max_bd - timedelta(days=3)
-                else:
-                    start = datetime.strptime(
-                        self.api_cfg.get("start_date_if_new", "2024-06-14"), "%Y-%m-%d"
-                    ).date()
-
-                self.logger.info(f"Tabela istnieje – pobieram od {start} do {tomorrow}")
-
-            for i, d in enumerate(self._date_range(start, tomorrow), 1):
-                self.logger.info(f"[{i}] Pobieranie {d}")
-                data = self._fetch_rce(d)
-                if data:
-                    self._insert_data(cursor, data)
-                else:
-                    self.logger.info(f"Brak danych dla {d}")
-
-            self.logger.info("=== Pobieranie zakończone sukcesem ===")
-
-        except Exception as e:
-            self.logger.error(f"Błąd krytyczny: {type(e).__name__}: {e}")
-            if self.connection:
-                self.connection.rollback()
-
-        finally:
-            if cursor:
-                cursor.close()
-            if self.connection:
-                self.connection.close()
-            self.logger.info("=== Aplikacja zakończyła działanie ===")
+                inserted += cursor.r
