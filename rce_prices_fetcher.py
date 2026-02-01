@@ -16,10 +16,13 @@ class RCEPricesFetcher(hass.Hass):
         self.api_cfg = self.args.get("api", {})
         self.table = self.db_cfg.get("table", "rce_prices")
 
-        # --- logger UTF-8 ---
-        default_logfile = "/config/logs/rce_prices_fetcher.log"
+        # --- automatyczna nazwa logu wg nazwy pliku ---
+        log_dir = "/config/logs"
+        base_name = os.path.splitext(os.path.basename(__file__))[0]
+        default_logfile = os.path.join(log_dir, f"{base_name}.log")
         self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
-        self.logger.info("=== RCE Prices Fetcher został uruchomiony ===")
+
+        self.logger.info("=== Pobieranie RCE z PSE (APIv2) uruchomione ===")
 
         # --- harmonogram dzienny ---
         schedule_cfg = self.args.get("schedule", {})
@@ -28,10 +31,6 @@ class RCEPricesFetcher(hass.Hass):
         run_time = time(hour=run_hour, minute=run_minute)
         self.run_daily(self.run_job, run_time)
         self.logger.info(f"Harmonogram dzienny ustawiony: {run_hour:02d}:{run_minute:02d}")
-
-        # --- manualny trigger ---
-        self.register_service("appdaemon/fetch_rce", self.run_job)
-        self.logger.info("Manualny trigger 'appdaemon/fetch_rce' zarejestrowany")
 
     # ---------------------------------------------------------------------
 
@@ -134,7 +133,7 @@ class RCEPricesFetcher(hass.Hass):
                         item.get("publication_ts"),
                     ),
                 )
-                inserted += cursor.rowcount  # <-- poprawione, pełna linia
+                inserted += cursor.rowcount
             except Exception as e:
                 self.logger.error(f"Błąd zapisu rekordu: {e} | {item}")
 
