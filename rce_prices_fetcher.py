@@ -22,7 +22,7 @@ class RCEPricesFetcher(hass.Hass):
         default_logfile = os.path.join(log_dir, f"{base_name}.log")
         self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
 
-        self.logger.info("=== Pobieranie RCE z PSE (APIv2) uruchomione ===")
+        self.logger.info("=== Aplikacja RCE API2 uruchomiona ===")
 
         # --- harmonogram dzienny ---
         schedule_cfg = self.args.get("schedule", {})
