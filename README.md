@@ -27,10 +27,9 @@ rce_prices_fetcher:
     start_date_if_new: "2024-06-14"
 
   logging:
-    file: /addon_configs/a0d7b954_appdaemon/logs/rce_fetch_utf8.log
+    file: /config/appdaemon/logs/rce_fetch_utf8.log
 
   schedule:
     hour: 14
     minute: 35
-
 ```
