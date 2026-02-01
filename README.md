@@ -42,7 +42,7 @@ fetch_rce_manual:
     - service: appdaemon.call_service
       data:
         app_name: rce_prices_fetcher
-        service_name: fetch_rce
+        service_name: appdaemon/fetch_rce
 ```
 
 secrets.yaml
