@@ -38,11 +38,11 @@ scripts.yaml
 ```yaml
 fetch_rce_manual:
   alias: "Ręczne pobranie RCE"
-  description: "Uruchamia ręcznie pobieranie danych RCE przez AppDaemon"
-  mode: single
   sequence:
-    - service: appdaemon.rce_prices_fetcher
-      data: {}
+    - service: appdaemon.call_service
+      data:
+        app_name: rce_prices_fetcher
+        service_name: fetch_rce
 ```
 
 secrets.yaml
