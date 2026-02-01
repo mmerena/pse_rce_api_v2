@@ -177,7 +177,7 @@ END$$
 
 DELIMITER ;
 
------------------------------------------------------------
+-- ---------------------------------------------------------
 --
 -- TAURON G13
 --
@@ -185,6 +185,9 @@ DELIMITER ;
 -- latem w godzinach 19:00 – 22:00, zimą w godzinach 16:00 – 21:00, pozostałe godziny (najniższa cena)
 -- latem 13:00 – 19:00 oraz 22:00 – 7:00, zimą 13:00 – 16:00 oraz 21:00 – 7:00, a także weekendy.
 --
+
+CREATE OR REPLACE VIEW tauron_G13 AS
+SELECT * FROM (
 
 WITH RECURSIVE dates AS (
     SELECT DATE_SUB(CURDATE(), INTERVAL 180 DAY) AS `date`
@@ -235,9 +238,10 @@ SELECT
 FROM dates
 WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
 
-ORDER BY time_utc;
+) g13;
 
------------------------------------------------------------
+
+-- ---------------------------------------------------------
 --
 -- TAURON G12w
 --
@@ -245,6 +249,9 @@ ORDER BY time_utc;
 -- oraz w weekendy i w dniach ustawowo wolnych od pracy.
 --
 
+CREATE OR REPLACE VIEW tauron_G12w AS
+SELECT * FROM (
+
 WITH RECURSIVE dates AS (
     SELECT DATE_SUB(CURDATE(), INTERVAL 180 DAY) AS `date`
     UNION ALL
@@ -292,14 +299,17 @@ SELECT
 FROM dates
 WHERE DAYOFWEEK(`date`) BETWEEN 2 AND 6
 
-ORDER BY time_utc;
+) g12w;
 
------------------------------------------------------------
+-- ---------------------------------------------------------
 -- TAUROG G12
 --
 -- Taryfa G12 – tańsza energia elektryczna w ciągu dnia w godzinach 13:00 – 15:00 oraz 22:00 – 6:00.
 --
 
+CREATE OR REPLACE VIEW tauron_G12 AS
+SELECT * FROM (
+
 WITH RECURSIVE dates AS (
     SELECT DATE_SUB(CURDATE(), INTERVAL 180 DAY) AS `date`
     UNION ALL
@@ -343,6 +353,6 @@ SELECT
     'T1 -> T2' AS `text`
 FROM dates
 
-ORDER BY time_utc;
+) g12;
 ```
  
