@@ -19,8 +19,7 @@ class RCEPricesFetcher(hass.Hass):
         # --- logger UTF-8 ---
         default_logfile = "/config/logs/rce_prices_fetcher.log"
         self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
-        self.logger.info("=== RCEPricesFetcher uruchomiony ===")
-        self.logger.info("=== Test UTF-8: ąćęłńóśźż ===")
+        self.logger.info("=== RCE Prices Fetcher został uruchomiony ===")
 
         # --- harmonogram dzienny ---
         schedule_cfg = self.args.get("schedule", {})
