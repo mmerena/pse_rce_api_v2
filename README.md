@@ -33,3 +33,14 @@ rce_prices_fetcher:
     hour: 14
     minute: 35
 ```
+
+scripts.yaml
+```yaml
+fetch_rce_manual:
+  alias: "Ręczne pobranie RCE"
+  description: "Uruchamia ręcznie pobieranie danych RCE przez AppDaemon"
+  mode: single
+  sequence:
+    - service: appdaemon.rce_prices_fetcher
+      data: {}
+```
