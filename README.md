@@ -34,6 +34,11 @@ rights:
     privileges:
       - SELECT
 ```
+configuration.yaml
+```yaml
+recorder:
+  db_url: mysql://homeassistant:****************@core-mariadb/homeassistant?charset=utf8mb4
+```
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> AppDaemon
  -> Zainstaluj
@@ -353,4 +358,60 @@ SELECT
 FROM dates
 
 ) g12;
+```
+
+Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> Forecast.Solar
+
+Ustawienia -> Dodatki -> Sklep z dodatkami -> Grafana -> Zainstaluj
+
+Data Sources -> Add data source: MySQL [ Host URL: core-mariadb, Database name: homeassistant, Username: grafana, Password: **************** ]
+
+Dashboards -> Add visualization: 
+
+RCE:
+```sql
+SELECT
+    DATE_SUB(`dtime_utc`, INTERVAL 15 MINUTE) AS time,
+    `rce_pln` AS RCE
+FROM `rce_prices`;
+```
+energy_production_tomorrow:
+```sql
+SELECT
+    DATE_ADD(FROM_UNIXTIME(`last_updated_ts`), INTERVAL 1 DAY) AS time,
+    100 * CAST(`state` AS DECIMAL(10,4)) AS energy_production_tomorrow
+FROM `states`
+INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_production_tomorrow';
+```
+energy_production_today:
+```sql
+SELECT
+    FROM_UNIXTIME(`last_updated_ts`) AS time,
+    100 * CAST(`state` AS DECIMAL(10,4)) AS energy_production_today
+FROM `states`
+INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_production_today';
+```
+power_production_now:
+```sql
+SELECT
+    FROM_UNIXTIME(`last_updated_ts`) AS time,
+    CAST(`state` AS DECIMAL(10,4)) AS power_production_now
+FROM `states`
+INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.power_production_now';
+```
+energy_next_hour:
+```sql
+SELECT
+    FROM_UNIXTIME(`last_updated_ts`) AS time,
+    1000 * CAST(`state` AS DECIMAL(10,4)) AS energy_next_hour
+FROM `states`
+INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_next_hour';
+```
+energy_current_hour:
+```sql
+SELECT
+    FROM_UNIXTIME(`last_updated_ts`) AS time,
+    1000 * CAST(`state` AS DECIMAL(10,4)) AS energy_current_hour
+FROM `states`
+INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_current_hour';
 ```
