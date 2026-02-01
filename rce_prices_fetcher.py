@@ -1,0 +1,218 @@
+import appdaemon.plugins.hass.hassapi as hass
+
+import logging
+import signal
+import sys
+from datetime import date, timedelta, datetime
+
+import requests
+import pymysql
+from pymysql.err import ProgrammingError
+
+
+class RCEPricesFetcher(hass.Hass):
+
+    def initialize(self):
+        self.db_cfg = self.args["db"]
+        self.api_cfg = self.args["api"]
+        self.log_cfg = self.args["logging"]
+
+        self.table = self.db_cfg["table"]
+
+        self.logger = self._setup_utf8_logger(self.log_cfg["file"])
+
+        self.logger.info("=== RCEPricesFetcher uruchomiony ===")
+
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+        # Jednorazowe uruchomienie po starcie AppDaemon
+        self.run_in(self.run_job, 1)
+
+    # ---------------------------------------------------------------------
+
+    def _setup_utf8_logger(self, logfile):
+        logger = logging.getLogger("rce_prices_fetcher")
+        logger.setLevel(logging.INFO)
+
+        if not logger.handlers:
+            handler = logging.FileHandler(logfile, encoding="utf-8")
+            formatter = logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(message)s"
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
+        return logger
+
+    # ---------------------------------------------------------------------
+
+    def _signal_handler(self, sig, frame):
+        self.logger.warning(
+            "Otrzymano SIGTERM (timeout / restart AppDaemon) – kończę bezpiecznie"
+        )
+        if hasattr(self, "connection") and self.connection:
+            try:
+                self.connection.commit()
+                self.logger.info("Ostatni commit wykonany")
+            except Exception as e:
+                self.logger.error(f"Błąd commit przy SIGTERM: {e}")
+        sys.exit(0)
+
+    # ---------------------------------------------------------------------
+
+    def _connect_db(self):
+        return pymysql.connect(
+            host=self.db_cfg["host"],
+            user=self.db_cfg["user"],
+            password=self.db_cfg["password"],
+            db=self.db_cfg["name"],
+            charset="utf8mb4",
+            autocommit=False,
+        )
+
+    # ---------------------------------------------------------------------
+
+    def _table_exists(self, cursor):
+        try:
+            cursor.execute(f"SHOW TABLES LIKE '{self.table}'")
+            return cursor.fetchone() is not None
+        except ProgrammingError:
+            return False
+
+    # ---------------------------------------------------------------------
+
+    def _create_table(self, cursor):
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {self.table} (
+                dtime_utc DATETIME PRIMARY KEY,
+                period_utc VARCHAR(20),
+                dtime DATETIME,
+                period VARCHAR(20),
+                rce_pln FLOAT,
+                business_date DATE,
+                publication_ts_utc DATETIME,
+                publication_ts DATETIME
+            )
+            """
+        )
+        self.logger.info(f"Utworzono tabelę {self.table}")
+
+    # ---------------------------------------------------------------------
+
+    def _fetch_rce(self, date_str):
+        url = (
+            f"{self.api_cfg['base_url']}"
+            f"?%24filter=business_date%20eq%20%27{date_str}%27"
+        )
+
+        try:
+            r = requests.get(url, timeout=30)
+            r.raise_for_status()
+            data = r.json().get("value", [])
+            self.logger.info(f"Pobrano {len(data)} rekordów dla {date_str}")
+            return data
+        except Exception as e:
+            self.logger.error(f"Błąd API dla {date_str}: {e}")
+            return []
+
+    # ---------------------------------------------------------------------
+
+    def _insert_data(self, cursor, data):
+        inserted = 0
+
+        for item in data:
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT IGNORE INTO {self.table}
+                    (dtime_utc, period_utc, dtime, period, rce_pln,
+                     business_date, publication_ts_utc, publication_ts)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        item["dtime_utc"],
+                        item["period_utc"],
+                        item["dtime"],
+                        item["period"],
+                        item["rce_pln"],
+                        item["business_date"],
+                        item["publication_ts_utc"],
+                        item["publication_ts"],
+                    ),
+                )
+                inserted += cursor.rowcount
+            except Exception as e:
+                self.logger.error(f"Błąd zapisu rekordu: {e}")
+
+        self.connection.commit()
+        self.logger.info(f"Zapisano {inserted} nowych rekordów")
+
+    # ---------------------------------------------------------------------
+
+    def _date_range(self, start, end):
+        cur = start
+        while cur <= end:
+            yield cur.strftime("%Y-%m-%d")
+            cur += timedelta(days=1)
+
+    # ---------------------------------------------------------------------
+
+    def run_job(self, kwargs):
+        self.connection = None
+        cursor = None
+
+        try:
+            self.connection = self._connect_db()
+            cursor = self.connection.cursor()
+
+            tomorrow = date.today() + timedelta(days=1)
+
+            if not self._table_exists(cursor):
+                self._create_table(cursor)
+                self.connection.commit()
+                start = datetime.strptime(
+                    self.api_cfg["start_date_if_new"], "%Y-%m-%d"
+                ).date()
+                self.logger.info(
+                    f"Nowa tabela – pobieram od {start} do {tomorrow}"
+                )
+            else:
+                cursor.execute(
+                    f"SELECT MAX(business_date) FROM {self.table}"
+                )
+                max_bd = cursor.fetchone()[0]
+                if max_bd:
+                    start = max_bd - timedelta(days=3)
+                else:
+                    start = datetime.strptime(
+                        self.api_cfg["start_date_if_new"], "%Y-%m-%d"
+                    ).date()
+
+                self.logger.info(
+                    f"Tabela istnieje – pobieram od {start} do {tomorrow}"
+                )
+
+            for i, d in enumerate(
+                self._date_range(start, tomorrow), 1
+            ):
+                self.logger.info(f"[{i}] Pobieranie {d}")
+                data = self._fetch_rce(d)
+                if data:
+                    self._insert_data(cursor, data)
+                else:
+                    self.logger.info(f"Brak danych dla {d}")
+
+            self.logger.info("=== Pobieranie zakończone sukcesem ===")
+
+        except Exception as e:
+            self.logger.error(f"Błąd krytyczny: {type(e).__name__}: {e}")
+            if self.connection:
+                self.connection.rollback()
+
+        finally:
+            if cursor:
+                cursor.close()
+            if self.connection:
+                self.connection.close()
+            self.logger.info("=== Aplikacja zakończyła działanie ===")
