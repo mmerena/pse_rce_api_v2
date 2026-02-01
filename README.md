@@ -1,3 +1,56 @@
+Ustawienia -> Dodatki -> Sklep z dodatkami -> File editor
+ -> Zainstaluj
+ -> Konfiguracja
+
+```yaml
+dirsfirst: true
+enforce_basepath: false
+git: false
+ignore_pattern:
+  - __pycache__
+  - .cloud
+  - .storage
+  - deps
+ssh_keys: []
+```
+
+Ustawienia -> Dodatki -> Sklep z dodatkami -> MariaDB
+ -> Zainstaluj
+ -> Konfiguracja
+
+```yaml
+databases:
+  - homeassistant
+logins:
+  - username: homeassistant
+    password: ****************
+  - username: grafana
+    password: ****************
+rights:
+  - username: homeassistant
+    database: homeassistant
+  - username: grafana
+    database: homeassistant
+    privileges:
+      - SELECT
+```
+
+Ustawienia -> Dodatki -> Sklep z dodatkami -> phpMyAdmin
+ -> Zainstaluj
+
+Ustawienia -> Dodatki -> Sklep z dodatkami -> AppDaemon
+ -> Zainstaluj
+ -> Konfiguracja
+
+```yaml
+system_packages: []
+python_packages:
+  - Requests
+  - PyMySQL
+init_commands: []
+log_level: info
+```
+
 Struktura plików:
 ```text
 /addon_configs/a0d7b954_appdaemon/
