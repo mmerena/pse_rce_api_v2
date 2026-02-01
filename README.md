@@ -34,31 +34,9 @@ rce_prices_fetcher:
     minute: 35
 ```
 
-scripts.yaml
-```yaml
-fetch_rce_manual:
-  alias: "Ręczne pobranie RCE"
-  sequence:
-    - service: appdaemon.call_service
-      data:
-        app_name: rce_prices_fetcher
-        service_name: appdaemon/fetch_rce
-```
-
 secrets.yaml
 ```yaml
 mariadb_user: homeassistant
 mariadb_password: ****************
-```
-
-Lovelace — przycisk do manualnego pobrania
-```yaml
-type: button
-tap_action:
-  action: call-service
-  service: fetch_rce_manual
-name: Pobierz RCE teraz
-icon: mdi:flash
-show_state: false
 ```
 
