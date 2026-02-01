@@ -32,4 +32,5 @@ rce_prices_fetcher:
   schedule:
     hour: 14
     minute: 35
+
 ```
