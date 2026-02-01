@@ -30,7 +30,7 @@ class RCEPricesFetcher(hass.Hass):
         run_minute = schedule_cfg.get("minute", 35)
         run_time = time(hour=run_hour, minute=run_minute)
         self.run_daily(self.run_job, run_time)
-        self.logger.info(f"Harmonogram dzienny ustawiony: {run_hour:02d}:{run_minute:02d}")
+        self.logger.info(f"Harmonogram dzienny ustawiony na {run_hour:02d}:{run_minute:02d}")
 
     # ---------------------------------------------------------------------
 
