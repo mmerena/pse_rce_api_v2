@@ -18,7 +18,11 @@ class RCEPricesFetcher(hass.Hass):
         self.table = self.db_cfg.get("table", "rce_prices")
 
         # --- logger UTF-8 ---
-        self.logger = self._setup_utf8_logger(self.log_cfg.get("file", "/config/appdaemon/logs/rce_fetch_utf8.log"))
+        self.logger = self._setup_utf8_logger(
+            self.log_cfg.get(
+                "file", "/config/appdaemon/logs/rce_fetch_utf8.log"
+            )
+        )
         self.logger.info("=== RCEPricesFetcher uruchomiony ===")
 
         # --- harmonogram dzienny ---
@@ -29,22 +33,23 @@ class RCEPricesFetcher(hass.Hass):
         self.run_daily(self.run_job, run_time)
         self.logger.info(f"Harmonogram dzienny ustawiony: {run_hour:02d}:{run_minute:02d}")
 
+        # --- manualny trigger ---
+        self.register_service("appdaemon/fetch_rce", self.run_job)
+        self.logger.info("Manualny trigger 'appdaemon/fetch_rce' zarejestrowany")
+
     # ---------------------------------------------------------------------
 
     def _setup_utf8_logger(self, logfile):
         logger = logging.getLogger("rce_prices_fetcher")
         logger.setLevel(logging.INFO)
 
-        # Tworzenie katalogu jeśli nie istnieje
         log_dir = os.path.dirname(logfile)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
 
         if not logger.handlers:
             handler = logging.FileHandler(logfile, encoding="utf-8")
-            formatter = logging.Formatter(
-                "%(asctime)s [%(levelname)s] %(message)s"
-            )
+            formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
             handler.setFormatter(formatter)
             logger.addHandler(handler)
 
@@ -149,7 +154,7 @@ class RCEPricesFetcher(hass.Hass):
 
     # ---------------------------------------------------------------------
 
-    def run_job(self, kwargs):
+    def run_job(self, kwargs=None):
         self.connection = None
         cursor = None
 
