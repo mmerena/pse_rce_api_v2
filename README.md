@@ -363,9 +363,9 @@ FROM dates
 Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> Forecast.Solar
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> Grafana -> Zainstaluj
-
+```text
 Data Sources -> Add data source: MySQL [ Host URL: core-mariadb, Database name: homeassistant, Username: grafana, Password: **************** ]
-
+```
 Dashboards -> Add visualization: 
 
 RCE:
