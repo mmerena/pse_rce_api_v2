@@ -27,7 +27,7 @@ rce_prices_fetcher:
     start_date_if_new: "2024-06-14"
 
   logging:
-    file: /config/appdaemon/logs/rce_fetch_utf8.log
+    file: /config/logs/rce_prices_fetcher.log
 
   schedule:
     hour: 14
@@ -44,3 +44,20 @@ fetch_rce_manual:
     - service: appdaemon.rce_prices_fetcher
       data: {}
 ```
+
+secrets.yaml
+```yaml
+mariadb_user: homeassistant
+mariadb_password: ****************
+```
+
+Lovelace — przycisk do manualnego pobrania
+```yaml
+type: button
+tap_action:
+  action: call-service
+  service: fetch_rce_manual
+name: Pobierz RCE teraz
+icon: mdi:flash
+```
+
