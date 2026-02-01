@@ -2,65 +2,61 @@ import hassapi as hass
 import requests
 import pymysql
 from datetime import date, timedelta, datetime
-import logging
-
-# ------------------------------------------------------------------------------
-# Konfiguracja – możesz przenieść do apps.yaml jako argumenty
-# ------------------------------------------------------------------------------
-DB_HOST = "core-mariadb"
-DB_USER = "homeassistant"
-DB_PASSWORD = "MvMkZK6x5QeSCqXh"          # ← zmień / przenieś do secrets!
-DB_NAME = "homeassistant"
-TABLE_NAME = "rce_prices"
-
-API_BASE_URL = "https://api.raporty.pse.pl/api/rce-pln"
-START_DATE_IF_NEW = "2024-06-14"
-
-# ------------------------------------------------------------------------------
-
 
 class RcePricesFetcher(hass.Hass):
     def initialize(self):
         self.log("Inicjalizacja RCE Prices Fetcher")
 
-        # Rejestrujemy codzienne uruchomienie o 18:00
-        # run_daily przyjmuje datetime.time lub string w formacie HH:MM:SS
-        self.run_daily(
-            self.fetch_and_store,
-            "18:00:00",
-            # Możesz dodać constrain_days="mon,tue,wed,thu,fri,sat,sun" jeśli chcesz ograniczyć dni
-        )
+        # Pobieramy wszystkie potrzebne wartości z konfiguracji (apps.yaml)
+        self.db_host       = self.args.get("db_host", "core-mariadb")
+        self.db_user       = self.args.get("db_user")
+        self.db_password   = self.args.get("db_password")
+        self.db_name       = self.args.get("db_name", "homeassistant")
+        self.table_name    = self.args.get("table_name", "rce_prices")
 
-        # Opcjonalnie – uruchom raz przy starcie (przydatne do testów lub gdy tabela pusta)
-        # self.fetch_and_store({})
+        self.api_base_url  = self.args.get("api_base_url", "https://api.raporty.pse.pl/api/rce-pln")
+        self.start_date_if_new = self.args.get("start_date_if_new", "2024-06-14")
+
+        # Podstawowe sprawdzenie czy mamy hasło i użytkownika
+        if not self.db_user or not self.db_password:
+            self.log("Brak db_user lub db_password w konfiguracji → AppDaemon nie będzie działał", level="ERROR")
+            return
+
+        self.log(f"Konfiguracja załadowana → tabela: {self.table_name}, api: {self.api_base_url}")
+
+        # Uruchamiamy codziennie o 18:00
+        self.run_daily(self.fetch_and_store, "18:00:00")
 
         self.log("Harmonogram ustawiony – codzienne pobieranie o 18:00")
+
 
     def connect_to_db(self):
         try:
             conn = pymysql.connect(
-                host=DB_HOST,
-                user=DB_USER,
-                password=DB_PASSWORD,
-                database=DB_NAME,
+                host=self.db_host,
+                user=self.db_user,
+                password=self.db_password,
+                database=self.db_name,
                 charset="utf8mb4",
-                cursorclass=pymysql.cursors.DictCursor,  # wygodniej niż tuple
+                cursorclass=pymysql.cursors.DictCursor,
             )
             return conn
         except Exception as e:
             self.log(f"Błąd połączenia z bazą: {e}", level="ERROR")
             return None
 
+
     def table_exists(self, cursor):
         try:
-            cursor.execute(f"SHOW TABLES LIKE '{TABLE_NAME}'")
+            cursor.execute(f"SHOW TABLES LIKE '{self.table_name}'")
             return cursor.fetchone() is not None
         except:
             return False
 
+
     def create_table(self, cursor):
         sql = f"""
-        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+        CREATE TABLE IF NOT EXISTS {self.table_name} (
             dtime_utc DATETIME PRIMARY KEY,
             period_utc VARCHAR(20),
             dtime DATETIME,
@@ -72,10 +68,11 @@ class RcePricesFetcher(hass.Hass):
         )
         """
         cursor.execute(sql)
-        self.log(f"Tabela {TABLE_NAME} utworzona lub już istnieje")
+        self.log(f"Tabela {self.table_name} utworzona lub już istnieje")
+
 
     def fetch_rce_data(self, date_str: str):
-        url = f"{API_BASE_URL}?$filter=business_date eq '{date_str}'"
+        url = f"{self.api_base_url}?$filter=business_date eq '{date_str}'"
         try:
             r = requests.get(url, timeout=15)
             r.raise_for_status()
@@ -86,13 +83,14 @@ class RcePricesFetcher(hass.Hass):
             self.log(f"Błąd API dla {date_str}: {e}", level="ERROR")
             return []
 
+
     def insert_data(self, cursor, conn, data):
         inserted = 0
         for row in data:
             try:
                 cursor.execute(
                     f"""
-                    INSERT IGNORE INTO {TABLE_NAME}
+                    INSERT IGNORE INTO {self.table_name}
                     (dtime_utc, period_utc, dtime, period, rce_pln, business_date, publication_ts_utc, publication_ts)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
@@ -118,17 +116,17 @@ class RcePricesFetcher(hass.Hass):
         else:
             self.log("Brak nowych rekordów do zapisania")
 
+
     def get_max_business_date(self, cursor):
         try:
-            cursor.execute(f"SELECT MAX(business_date) FROM {TABLE_NAME}")
+            cursor.execute(f"SELECT MAX(business_date) FROM {self.table_name}")
             result = cursor.fetchone()
-            max_date = result["MAX(business_date)"] if result else None
-            return max_date
+            return result["MAX(business_date)"] if result else None
         except:
             return None
 
+
     def fetch_and_store(self, kwargs):
-        """Główna funkcja uruchamiana codziennie o 18:00"""
         self.log("START – pobieranie cen RCE")
 
         conn = self.connect_to_db()
@@ -138,26 +136,23 @@ class RcePricesFetcher(hass.Hass):
         try:
             cursor = conn.cursor()
 
-            # Sprawdzamy / tworzymy tabelę
             if not self.table_exists(cursor):
                 self.create_table(cursor)
                 conn.commit()
-                start_date_str = START_DATE_IF_NEW
+                start_date_str = self.start_date_if_new
                 self.log("Nowa tabela – pobieram od daty startowej")
             else:
                 max_bd = self.get_max_business_date(cursor)
                 if max_bd is None:
-                    start_date_str = START_DATE_IF_NEW
+                    start_date_str = self.start_date_if_new
                     self.log("Tabela pusta – pobieram od daty startowej")
                 else:
-                    # pobieramy od 3 dni wcześniej na wszelki wypadek (korekty PSE)
                     start_dt = datetime.strptime(str(max_bd), "%Y-%m-%d").date() - timedelta(days=3)
                     start_date_str = start_dt.strftime("%Y-%m-%d")
                     self.log(f"Pobieram od {start_date_str} (max w bazie = {max_bd})")
 
             tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            # Generujemy listę dat
             current = datetime.strptime(start_date_str, "%Y-%m-%d").date()
             end = datetime.strptime(tomorrow_str, "%Y-%m-%d").date()
             dates = []
@@ -176,13 +171,14 @@ class RcePricesFetcher(hass.Hass):
             self.log("Pobieranie i zapis zakończone")
 
         except Exception as e:
-            self.log(f"Błąd krytyczny w fetch_and_store: {e}", level="ERROR")
+            self.log(f"Błąd krytyczny: {e}", level="ERROR")
             if conn:
                 try:
                     conn.rollback()
                 except:
                     pass
         finally:
-            if "cursor" in locals():
+            if "cursor" in locals() and cursor:
                 cursor.close()
-            conn.close()
+            if conn:
+                conn.close()
