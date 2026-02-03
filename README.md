@@ -37,8 +37,12 @@ rights:
 configuration.yaml
 ```yaml
 recorder:
-  db_url: mysql://homeassistant:****************@core-mariadb/homeassistant?charset=utf8mb4
+  db_url: !secret mariadb_url
+  purge_keep_days: 10
+  auto_purge: true
 ```
+
+Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> Forecast.Solar
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> AppDaemon
  -> Zainstaluj
@@ -58,9 +62,11 @@ Struktura plików:
 /addon_configs/a0d7b954_appdaemon/
 ├── apps/
 │   └── rce_prices_fetcher.py
+│   └── sensors_to_db.py
 ├── apps.yaml
 ├── logs/
 │   └── rce_prices_fetcher.log
+│   └── sensors_to_db.log
 ```
 
 apps.yaml
@@ -87,12 +93,27 @@ rce_prices_fetcher:
   schedule:
     hour: 14
     minute: 35
+
+sensors_to_db:
+  module: sensors_to_db
+  class: SensorsToDB
+
+  db:
+    host: core-mariadb
+    name: homeassistant
+    user: !secret mariadb_user
+    password: !secret mariadb_password
+
+  groups:
+    forecast_solar:
+      - sensor.power_production_now
 ```
 
 secrets.yaml
 ```yaml
 mariadb_user: homeassistant
 mariadb_password: ****************
+mariadb_url: mysql://homeassistant:****************@core-mariadb/homeassistant?charset=utf8mb4
 ```
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> phpMyAdmin
@@ -362,8 +383,6 @@ FROM dates
 ) g12
 ORDER BY 1 DESC;
 ```
-
-Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> Forecast.Solar
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> Grafana -> Zainstaluj
 
