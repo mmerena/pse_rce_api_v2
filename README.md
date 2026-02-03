@@ -74,8 +74,8 @@ log_level: info
 Struktura plików:
 ```text
 /addon_configs/a0d7b954_appdaemon/
-├── apps.yaml
 ├── apps/
+│   └── apps.yaml
 │   └── rce_prices_fetcher.py
 │   └── sensors_to_db.py
 ├── logs/
