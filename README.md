@@ -79,9 +79,9 @@ rce_prices_fetcher:
   db:
     host: core-mariadb
     name: homeassistant
-    table: rce_prices
     user: !secret mariadb_user
     password: !secret mariadb_password
+    table: rce_prices
 
   api:
     base_url: https://api.raporty.pse.pl/api/rce-pln
