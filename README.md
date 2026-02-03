@@ -123,7 +123,7 @@ rce_prices_fetcher:
     start_date_if_new: "2024-06-14"
 
   schedule:
-    hour: 14
+    hour:   14
     minute: 35
 ```
 
