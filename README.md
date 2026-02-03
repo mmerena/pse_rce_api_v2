@@ -1,3 +1,5 @@
+# RCE - Rynkowa cena energii elektrycznej
+
 Ustawienia -> Dodatki -> Sklep z dodatkami -> File editor
  -> Zainstaluj
  -> Konfiguracja
@@ -87,7 +89,11 @@ sensors_to_db:
 
   groups:
     forecast_solar:
+      - sensor.energy_production_tomorrow
+      - sensor.energy_production_today
       - sensor.power_production_now
+      - sensor.energy_next_hour
+      - sensor.energy_current_hour
 
 rce_prices_fetcher:
   module: rce_prices_fetcher
@@ -110,7 +116,6 @@ rce_prices_fetcher:
   schedule:
     hour: 14
     minute: 35
-
 ```
 
 secrets.yaml
@@ -406,40 +411,40 @@ FROM `rce_prices`;
 energy_production_tomorrow:
 ```sql
 SELECT
-    DATE_ADD(FROM_UNIXTIME(`last_updated_ts`), INTERVAL 1 DAY) AS time,
-    100 * CAST(`state` AS DECIMAL(10,4)) AS energy_production_tomorrow
-FROM `states`
-INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_production_tomorrow';
+    DATE_ADD(`dtime_utc`, INTERVAL 1 DAY) AS time,
+    100 * CAST(`entity_value` AS DECIMAL(10,4)) AS energy_production_tomorrow
+FROM `forecast_solar`
+INNER JOIN `states_meta` ON `forecast_solar`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_production_tomorrow';
 ```
 energy_production_today:
 ```sql
 SELECT
-    FROM_UNIXTIME(`last_updated_ts`) AS time,
-    100 * CAST(`state` AS DECIMAL(10,4)) AS energy_production_today
-FROM `states`
-INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_production_today';
+    `dtime_utc` AS time,
+    100 * CAST(`entity_value` AS DECIMAL(10,4)) AS energy_production_today
+FROM `forecast_solar`
+INNER JOIN `states_meta` ON `forecast_solar`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_production_today';
 ```
 power_production_now:
 ```sql
-SELECT
-    FROM_UNIXTIME(`last_updated_ts`) AS time,
-    CAST(`state` AS DECIMAL(10,4)) AS power_production_now
-FROM `states`
-INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.power_production_now';
+SELECT 
+    `dtime_utc` AS time,
+    CAST(`entity_value` AS DECIMAL(10,4)) AS power_production_now
+FROM `forecast_solar`
+INNER JOIN `states_meta` ON `forecast_solar`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.power_production_now';
 ```
 energy_next_hour:
 ```sql
 SELECT
-    FROM_UNIXTIME(`last_updated_ts`) AS time,
-    1000 * CAST(`state` AS DECIMAL(10,4)) AS energy_next_hour
-FROM `states`
-INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_next_hour';
+    DATE_ADD(`dtime_utc`, INTERVAL 1 HOUR) AS time,
+    1000 * CAST(`entity_value` AS DECIMAL(10,4)) AS energy_next_hour
+FROM `forecast_solar`
+INNER JOIN `states_meta` ON `forecast_solar`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_next_hour';
 ```
 energy_current_hour:
 ```sql
 SELECT
-    FROM_UNIXTIME(`last_updated_ts`) AS time,
-    1000 * CAST(`state` AS DECIMAL(10,4)) AS energy_current_hour
-FROM `states`
-INNER JOIN `states_meta` ON `states`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_current_hour';
+    `dtime_utc` AS time,
+    1000 * CAST(`entity_value` AS DECIMAL(10,4)) AS energy_current_hour
+FROM `forecast_solar`
+INNER JOIN `states_meta` ON `forecast_solar`.`metadata_id` = `states_meta`.`metadata_id` AND `states_meta`.`entity_id` = 'sensor.energy_current_hour';
 ```
