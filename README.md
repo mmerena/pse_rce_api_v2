@@ -40,12 +40,14 @@ rights:
     privileges:
       - SELECT
 ```
+
 secrets.yaml
 ```yaml
 mariadb_user: homeassistant
 mariadb_password: ****************
 mariadb_url: mysql://homeassistant:****************@core-mariadb/homeassistant?charset=utf8mb4
 ```
+
 configuration.yaml
 ```yaml
 recorder:
@@ -72,38 +74,18 @@ log_level: info
 Struktura plików:
 ```text
 /addon_configs/a0d7b954_appdaemon/
-├── apps/
-│   └── sensors_to_db.py
-│   └── rce_prices_fetcher.py
 ├── apps.yaml
+├── apps/
+│   └── rce_prices_fetcher.py
+│   └── sensors_to_db.py
 ├── logs/
-│   └── sensors_to_db.log
 │   └── rce_prices_fetcher.log
+│   └── sensors_to_db.log
 ```
 
 apps.yaml
 ```yaml
 ---
-sensors_to_db:
-  module: sensors_to_db
-  class: SensorsToDB
-
-  db:
-    host: core-mariadb
-    name: homeassistant
-    user: !secret mariadb_user
-    password: !secret mariadb_password
-    tables:
-      forecast_solar:
-        - sensor.energy_production_tomorrow
-        - sensor.energy_production_today
-        - sensor.power_production_now
-        - sensor.energy_next_hour
-        - sensor.energy_current_hour
-
-  logging:
-    file: /config/logs/sensors_to_db.log
-
 rce_prices_fetcher:
   module: rce_prices_fetcher
   class: RCEPricesFetcher
@@ -125,10 +107,31 @@ rce_prices_fetcher:
   schedule:
     hour:   14
     minute: 35
+
+sensors_to_db:
+  module: sensors_to_db
+  class: SensorsToDB
+
+  db:
+    host: core-mariadb
+    name: homeassistant
+    user: !secret mariadb_user
+    password: !secret mariadb_password
+    tables:
+      forecast_solar:
+        - sensor.energy_production_tomorrow
+        - sensor.energy_production_today
+        - sensor.power_production_now
+        - sensor.energy_next_hour
+        - sensor.energy_current_hour
+
+  logging:
+    file: /config/logs/sensors_to_db.log
 ```
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> phpMyAdmin
  -> Zainstaluj
+
 ```sql
 DELIMITER $$
 
@@ -398,9 +401,11 @@ ORDER BY 1 DESC;
 Ustawienia -> Dodatki -> Sklep z dodatkami -> Grafana -> Zainstaluj
 
 Data Sources -> Add data source:
+
 ```text
  MySQL [ Host URL: core-mariadb, Database name: homeassistant, Username: grafana, Password: **************** ]
 ```
+
 Dashboards -> Add visualization: 
 
 RCE:
