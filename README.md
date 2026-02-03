@@ -40,6 +40,12 @@ rights:
     privileges:
       - SELECT
 ```
+secrets.yaml
+```yaml
+mariadb_user: homeassistant
+mariadb_password: ****************
+mariadb_url: mysql://homeassistant:****************@core-mariadb/homeassistant?charset=utf8mb4
+```
 configuration.yaml
 ```yaml
 recorder:
@@ -120,13 +126,6 @@ rce_prices_fetcher:
   schedule:
     hour: 14
     minute: 35
-```
-
-secrets.yaml
-```yaml
-mariadb_user: homeassistant
-mariadb_password: ****************
-mariadb_url: mysql://homeassistant:****************@core-mariadb/homeassistant?charset=utf8mb4
 ```
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> phpMyAdmin
