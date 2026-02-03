@@ -104,6 +104,9 @@ sensors_to_db:
     user: !secret mariadb_user
     password: !secret mariadb_password
 
+  logging:
+    file: /config/logs/sensors_to_db.log
+
   groups:
     forecast_solar:
       - sensor.power_production_now
