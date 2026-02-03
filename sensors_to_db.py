@@ -80,7 +80,14 @@ class SensorsToDB(hass.Hass):
 
         connection = None
         try:
-            connection = pymysql.connect(**self.db_cfg, charset='utf8mb4')
+            connection = pymysql.connect(
+                host=self.db_cfg.get("host", "core-mariadb"),
+                user=self.db_cfg.get("user", "homeassistant"),
+                password=self.db_cfg.get("password", ""),
+                db=self.db_cfg.get("name", "homeassistant"),
+                charset="utf8mb4",
+                autocommit=False,
+            )
             cursor = connection.cursor()
 
             for table_name, entities in self.groups.items():
