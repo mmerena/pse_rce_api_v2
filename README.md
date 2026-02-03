@@ -61,17 +61,34 @@ Struktura plików:
 ```text
 /addon_configs/a0d7b954_appdaemon/
 ├── apps/
-│   └── rce_prices_fetcher.py
 │   └── sensors_to_db.py
+│   └── rce_prices_fetcher.py
 ├── apps.yaml
 ├── logs/
-│   └── rce_prices_fetcher.log
 │   └── sensors_to_db.log
+│   └── rce_prices_fetcher.log
 ```
 
 apps.yaml
 ```yaml
 ---
+sensors_to_db:
+  module: sensors_to_db
+  class: SensorsToDB
+
+  db:
+    host: core-mariadb
+    name: homeassistant
+    user: !secret mariadb_user
+    password: !secret mariadb_password
+
+  logging:
+    file: /config/logs/sensors_to_db.log
+
+  groups:
+    forecast_solar:
+      - sensor.power_production_now
+
 rce_prices_fetcher:
   module: rce_prices_fetcher
   class: RCEPricesFetcher
@@ -94,22 +111,6 @@ rce_prices_fetcher:
     hour: 14
     minute: 35
 
-sensors_to_db:
-  module: sensors_to_db
-  class: SensorsToDB
-
-  db:
-    host: core-mariadb
-    name: homeassistant
-    user: !secret mariadb_user
-    password: !secret mariadb_password
-
-  logging:
-    file: /config/logs/sensors_to_db.log
-
-  groups:
-    forecast_solar:
-      - sensor.power_production_now
 ```
 
 secrets.yaml
