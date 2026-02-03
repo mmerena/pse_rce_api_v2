@@ -115,12 +115,12 @@ rce_prices_fetcher:
     password: !secret mariadb_password
     table: rce_prices
 
+  logging:
+    file: /config/logs/rce_prices_fetcher.log
+
   api:
     base_url: https://api.raporty.pse.pl/api/rce-pln
     start_date_if_new: "2024-06-14"
-
-  logging:
-    file: /config/logs/rce_prices_fetcher.log
 
   schedule:
     hour: 14
