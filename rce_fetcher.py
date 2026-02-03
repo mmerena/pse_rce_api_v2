@@ -1,186 +1,159 @@
-# -*- coding: utf-8 -*-
+import appdaemon.plugins.hass.hassapi as hass
+import logging
+import os
+from datetime import datetime
 
-import hassapi as hass
-import requests
 import pymysql
-from datetime import date, timedelta, datetime
+from pymysql.err import OperationalError
 
-class RcePricesFetcher(hass.Hass):
+class SensorsToDB(hass.Hass):
+
     def initialize(self):
-        self.log("Inicjalizacja RCE Prices Fetcher")
+        # --- konfiguracja ---
+        self.db_cfg = self.args.get("db", {})
+        self.groups = self.args.get("groups", {})
 
-        # Pobieramy wszystkie potrzebne wartości z konfiguracji (apps.yaml)
-        self.db_host       = self.args.get("db_host", "core-mariadb")
-        self.db_user       = self.args.get("db_user")
-        self.db_password   = self.args.get("db_password")
-        self.db_name       = self.args.get("db_name", "homeassistant")
-        self.table_name    = self.args.get("table_name", "rce_prices")
+        # --- automatyczna nazwa logu wg nazwy pliku ---
+        log_dir = "/config/logs"
+        base_name = os.path.splitext(os.path.basename(__file__))[0]
+        default_logfile = os.path.join(log_dir, f"{base_name}.log")
+        self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
 
-        self.api_base_url  = self.args.get("api_base_url", "https://api.raporty.pse.pl/api/rce-pln")
-        self.start_date_if_new = self.args.get("start_date_if_new", "2024-06-14")
-
-        # Podstawowe sprawdzenie czy mamy hasło i użytkownika
-        if not self.db_user or not self.db_password:
-            self.log("Brak db_user lub db_password w konfiguracji → AppDaemon nie będzie działał", level="ERROR")
+        if not self.db_cfg or not self.groups:
+            self.logger.error("Brak konfiguracji DB lub grup sensorów!")
+            self.run_in(run_on_quarter, 600)
             return
 
-        self.log(f"Konfiguracja załadowana → tabela: {self.table_name}, api: {self.api_base_url}")
+        self.logger.info("=== Aplikacja SensorsToDB uruchomiona ===")
 
-        # Uruchamiamy codziennie o 18:00
-        self.run_daily(self.fetch_and_store, "18:00:00")
+        def run_on_quarter(kwargs=None):
+            now = datetime.now()
 
-        self.log("Harmonogram ustawiony – codzienne pobieranie o 18:00")
+            # Jeśli nie jesteśmy dokładnie na kwadransie → czekamy do najbliższego
+            if now.minute % 15 != 0 or now.second >= 5:
+                minutes_to_next = 15 - (now.minute % 15)
+                if minutes_to_next == 15:
+                    minutes_to_next = 0
+                seconds_to_wait = minutes_to_next * 60 - now.second
+                if seconds_to_wait <= 0:
+                    seconds_to_wait += 900
 
+                self.logger.info(f"Oczekiwanie {seconds_to_wait}s na uruchomienie...")
+                self.run_in(run_on_quarter, seconds_to_wait)
+                return
 
-    def connect_to_db(self):
+            # Jesteśmy na kwadransie → wykonujemy zapis
+            self.save_all_sensors(kwargs)
+
+            # Planujemy następne sprawdzenie za 10 minut
+            self.run_in(run_on_quarter, 600)
+
+        # Uruchamiamy pętlę
+        run_on_quarter()
+
+    def _setup_utf8_logger(self, logfile):
+        logger = logging.getLogger("sensors_to_db")
+        logger.setLevel(logging.INFO)
+
+        # Tworzymy katalog jeśli nie istnieje
+        log_dir = os.path.dirname(logfile)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+
+        if not logger.handlers:
+            handler = logging.FileHandler(logfile, encoding="utf-8")
+            formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
+        return logger
+
+    def save_all_sensors(self, kwargs):
+        now_local = datetime.now()
+        now_utc = datetime.utcnow()
+
+        # Zaokrąglamy do pełnego kwadransa (00,15,30,45)
+        minute = (now_local.minute // 15) * 15
+        dtime_local = now_local.replace(minute=minute, second=0, microsecond=0)
+        dtime_utc   = now_utc.replace(minute=minute, second=0, microsecond=0)
+
+        connection = None
         try:
-            conn = pymysql.connect(
-                host=self.db_host,
-                user=self.db_user,
-                password=self.db_password,
-                database=self.db_name,
-                charset="utf8mb4",
-                cursorclass=pymysql.cursors.DictCursor,
-            )
-            return conn
+            connection = pymysql.connect(**self.db_cfg, charset='utf8mb4')
+            cursor = connection.cursor()
+
+            for table_name, entities in self.groups.items():
+                self.ensure_table(cursor, table_name)
+
+                for entity_id in entities:
+                    state_obj = self.get_state(entity_id, attribute="all")
+
+                    if state_obj is None:
+                        self.logger.warning(f"Encja nie istnieje / niedostępna: {entity_id}")
+                        continue
+
+                    try:
+                        value_str = state_obj.get("state", None)
+                        if value_str in ("unavailable", "unknown", None):
+                            continue
+
+                        value = float(value_str)  # rzucamy wyjątek jeśli nie da się skonwertować
+                    except (ValueError, TypeError):
+                        self.logger.info(f"Nie udało się skonwertować na float: {entity_id} = {value_str}")
+                        continue
+
+                    metadata_id = self.get_metadata_id(cursor, entity_id)
+                    if metadata_id is None:
+                        self.logger.info(f"Brak metadata_id dla {entity_id} w states_meta!")
+                        continue
+
+                    sql = """
+                    INSERT IGNORE INTO `{}` 
+                    (dtime_utc, dtime, metadata_id, entity_value)
+                    VALUES (%s, %s, %s, %s)
+                    """.format(table_name)
+
+                    cursor.execute(sql, (
+                        dtime_utc,
+                        dtime_local,
+                        metadata_id,
+                        value
+                    ))
+
+            connection.commit()
+            self.logger.info(f"Zapisano dane o {dtime_local.strftime('%Y-%m-%d %H:%M')}")
+
+        except OperationalError as e:
+            self.logger.error(f"Błąd bazy danych: {e}")
         except Exception as e:
-            self.log(f"Błąd połączenia z bazą: {e}", level="ERROR")
-            return None
-
-
-    def table_exists(self, cursor):
-        try:
-            cursor.execute(f"SHOW TABLES LIKE '{self.table_name}'")
-            return cursor.fetchone() is not None
-        except:
-            return False
-
-
-    def create_table(self, cursor):
-        sql = f"""
-        CREATE TABLE IF NOT EXISTS {self.table_name} (
-            dtime_utc DATETIME PRIMARY KEY,
-            period_utc VARCHAR(20),
-            dtime DATETIME,
-            period VARCHAR(20),
-            rce_pln FLOAT,
-            business_date DATE,
-            publication_ts_utc DATETIME,
-            publication_ts DATETIME
-        )
-        """
-        cursor.execute(sql)
-        self.log(f"Tabela {self.table_name} utworzona lub już istnieje")
-
-
-    def fetch_rce_data(self, date_str: str):
-        url = f"{self.api_base_url}?$filter=business_date eq '{date_str}'"
-        try:
-            r = requests.get(url, timeout=15)
-            r.raise_for_status()
-            data = r.json().get("value", [])
-            self.log(f"Pobrano {len(data)} rekordów dla {date_str}")
-            return data
-        except Exception as e:
-            self.log(f"Błąd API dla {date_str}: {e}", level="ERROR")
-            return []
-
-
-    def insert_data(self, cursor, conn, data):
-        inserted = 0
-        for row in data:
-            try:
-                cursor.execute(
-                    f"""
-                    INSERT IGNORE INTO {self.table_name}
-                    (dtime_utc, period_utc, dtime, period, rce_pln, business_date, publication_ts_utc, publication_ts)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        row["dtime_utc"],
-                        row["period_utc"],
-                        row["dtime"],
-                        row["period"],
-                        row["rce_pln"],
-                        row["business_date"],
-                        row["publication_ts_utc"],
-                        row["publication_ts"],
-                    ),
-                )
-                inserted += cursor.rowcount
-            except Exception as e:
-                self.log(f"Błąd zapisu rekordu {row.get('dtime_utc','?')}: {e}", level="WARNING")
-                continue
-
-        if inserted > 0:
-            conn.commit()
-            self.log(f"Zapisano {inserted} nowych rekordów")
-        else:
-            self.log("Brak nowych rekordów do zapisania")
-
-
-    def get_max_business_date(self, cursor):
-        try:
-            cursor.execute(f"SELECT MAX(business_date) FROM {self.table_name}")
-            result = cursor.fetchone()
-            return result["MAX(business_date)"] if result else None
-        except:
-            return None
-
-
-    def fetch_and_store(self, kwargs):
-        self.log("START – pobieranie cen RCE")
-
-        conn = self.connect_to_db()
-        if not conn:
-            return
-
-        try:
-            cursor = conn.cursor()
-
-            if not self.table_exists(cursor):
-                self.create_table(cursor)
-                conn.commit()
-                start_date_str = self.start_date_if_new
-                self.log("Nowa tabela – pobieram od daty startowej")
-            else:
-                max_bd = self.get_max_business_date(cursor)
-                if max_bd is None:
-                    start_date_str = self.start_date_if_new
-                    self.log("Tabela pusta – pobieram od daty startowej")
-                else:
-                    start_dt = datetime.strptime(str(max_bd), "%Y-%m-%d").date() - timedelta(days=3)
-                    start_date_str = start_dt.strftime("%Y-%m-%d")
-                    self.log(f"Pobieram od {start_date_str} (max w bazie = {max_bd})")
-
-            tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
-
-            current = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end = datetime.strptime(tomorrow_str, "%Y-%m-%d").date()
-            dates = []
-            while current <= end:
-                dates.append(current.strftime("%Y-%m-%d"))
-                current += timedelta(days=1)
-
-            self.log(f"Planuję pobrać dane dla {len(dates)} dni")
-
-            for i, dt_str in enumerate(dates, 1):
-                self.log(f"[{i}/{len(dates)}] {dt_str}")
-                data = self.fetch_rce_data(dt_str)
-                if data:
-                    self.insert_data(cursor, conn, data)
-
-            self.log("Pobieranie i zapis zakończone")
-
-        except Exception as e:
-            self.log(f"Błąd krytyczny: {e}", level="ERROR")
-            if conn:
-                try:
-                    conn.rollback()
-                except:
-                    pass
+            self.logger.error(f"Nieoczekiwany błąd: {type(e).__name__}: {e}")
         finally:
-            if "cursor" in locals() and cursor:
-                cursor.close()
-            if conn:
-                conn.close()
+            if connection:
+                connection.close()
+
+
+    def ensure_table(self, cursor, table_name):
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS `{table_name}` (
+                dtime_utc DATETIME NOT NULL,
+                dtime DATETIME NOT NULL,
+                metadata_id BIGINT NOT NULL,
+                entity_value FLOAT NOT NULL,
+                PRIMARY KEY(dtime_utc, metadata_id),
+                KEY ixd_dtime_utc (dtime_utc),
+                KEY idx_dtime (dtime),
+                KEY idx_metadata (metadata_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+
+
+    def get_metadata_id(self, cursor, entity_id):
+        cursor.execute("""
+            SELECT metadata_id
+            FROM states_meta
+            WHERE entity_id = %s
+            LIMIT 1
+        """, (entity_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+
