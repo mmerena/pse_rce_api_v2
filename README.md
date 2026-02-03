@@ -77,10 +77,10 @@ Struktura plików:
 ├── apps/
 │   └── apps.yaml
 │   └── rce_prices_fetcher.py
-│   └── sensors_to_db.py
+│   └── save_sensors_to_db.py
 ├── logs/
 │   └── rce_prices_fetcher.log
-│   └── sensors_to_db.log
+│   └── save_sensors_to_db.log
 ```
 
 apps.yaml
@@ -108,8 +108,8 @@ rce_prices_fetcher:
     hour:   14
     minute: 35
 
-sensors_to_db:
-  module: sensors_to_db
+save_sensors_to_db:
+  module: save_sensors_to_db
   class: SensorsToDB
 
   db:
@@ -126,7 +126,7 @@ sensors_to_db:
         - sensor.energy_current_hour
 
   logging:
-    file: /config/logs/sensors_to_db.log
+    file: /config/logs/save_sensors_to_db.log
 ```
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> phpMyAdmin
