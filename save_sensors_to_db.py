@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 import pymysql
-from pymysql.err import OperationalError1
+from pymysql.err import OperationalError
 
 class SaveSensorsToDB(hass.Hass):
 
