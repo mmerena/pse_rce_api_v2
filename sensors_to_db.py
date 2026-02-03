@@ -19,6 +19,7 @@ class SensorsToDB(hass.Hass):
         default_logfile = os.path.join(log_dir, f"{base_name}.log")
         self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
 
+        # --- sprawdzenie konfiguracji bazy i sensorow ---
         if not self.db_cfg or not self.groups:
             self.logger.error("Brak konfiguracji DB lub grup sensorów!")
             self.run_in(run_on_quarter, 600)
