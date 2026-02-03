@@ -6,7 +6,7 @@ from datetime import datetime
 import pymysql
 from pymysql.err import OperationalError
 
-class SensorsToDB(hass.Hass):
+class SaveSensorsToDB(hass.Hass):
 
     def initialize(self):
         # --- konfiguracja ---
