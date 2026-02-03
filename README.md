@@ -2,7 +2,7 @@
 
 Tutaj znajdziesz dwa ciekawe skrypty w Python. Pierwszy pokazuje sposób pobierania danych ze źródeł zewnętrznych przez API (REST API), drugi jest przykładem logowania bieżących stanów lokalnych sensorów HA (HA loguje tylko zmiany stanów).
 Oba skrypty zapisują dane do lokalnaej bazy danych, z której w dalszej kolejności można je wykorzystywać na potrzeby m.in. automatyzacji (Energy Management System).
-W tym przykładzie wykorzystano dane o rynkowych cenach energii elektrycznej dostępne przez PSE RCE API v2 oraz dane z sensorów integracji Forecast.Solar. Są one źródłem dla wizualizacji w Grafana. Poniżej znajdują się wszystkie niezbędne integracje do zainstalowania w HA.
+W tym przykładzie wykorzystano dane o rynkowych cenach energii elektrycznej dostępne przez PSE RCE API v2 oraz dane z sensorów integracji Forecast.Solar. Tutaj są one źródłem dla wizualizacji w Grafana. Poniżej znajdują się wszystkie niezbędne integracje do zainstalowania w HA.
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> File editor
  -> Zainstaluj
