@@ -11,7 +11,7 @@ class SensorsToDB(hass.Hass):
     def initialize(self):
         # --- konfiguracja ---
         self.db_cfg = self.args.get("db", {})
-        self.groups = self.args.get("groups", {})
+        self.tables = self.db_cfg.get("groups", {})
 
         # --- automatyczna nazwa logu wg nazwy pliku ---
         log_dir = "/config/logs"
@@ -20,7 +20,7 @@ class SensorsToDB(hass.Hass):
         self.logger = self._setup_utf8_logger(self.args.get("logging", {}).get("file", default_logfile))
 
         # --- sprawdzenie konfiguracji bazy i sensorow ---
-        if not self.db_cfg or not self.groups:
+        if not self.db_cfg or not self.tables:
             self.logger.error("Brak konfiguracji DB lub grup sensorów!")
             self.run_in(run_on_quarter, 600)
             return
@@ -90,7 +90,7 @@ class SensorsToDB(hass.Hass):
             )
             cursor = connection.cursor()
 
-            for table_name, entities in self.groups.items():
+            for table_name, entities in self.tables.items():
                 self.ensure_table(cursor, table_name)
 
                 for entity_id in entities:
