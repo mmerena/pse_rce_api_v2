@@ -93,17 +93,16 @@ sensors_to_db:
     name: homeassistant
     user: !secret mariadb_user
     password: !secret mariadb_password
+    tables:
+      forecast_solar:
+        - sensor.energy_production_tomorrow
+        - sensor.energy_production_today
+        - sensor.power_production_now
+        - sensor.energy_next_hour
+        - sensor.energy_current_hour
 
   logging:
     file: /config/logs/sensors_to_db.log
-
-  groups:
-    forecast_solar:
-      - sensor.energy_production_tomorrow
-      - sensor.energy_production_today
-      - sensor.power_production_now
-      - sensor.energy_next_hour
-      - sensor.energy_current_hour
 
 rce_prices_fetcher:
   module: rce_prices_fetcher
