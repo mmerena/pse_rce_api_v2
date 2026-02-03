@@ -25,7 +25,7 @@ class SaveSensorsToDB(hass.Hass):
             self.run_in(run_on_quarter, 600)
             return
 
-        self.logger.info("=== Aplikacja SensorsToDB uruchomiona ===")
+        self.logger.info("=== Aplikacja SaveSensorsToDB uruchomiona ===")
 
         def run_on_quarter(kwargs=None):
             now = datetime.now()
