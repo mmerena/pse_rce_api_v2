@@ -399,7 +399,7 @@ FROM dates
 ORDER BY 1 DESC;
 ```
 
-Widoki dla SQL sensorów:
+Widoki dla SQL sensorów (Energy Management System):
 ```sql
 CREATE OR REPLACE VIEW rce_prices_today AS
 
