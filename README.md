@@ -398,6 +398,81 @@ FROM dates
 ORDER BY 1 DESC;
 ```
 
+Widoki dla SQL sensorów:
+```sql
+CREATE OR REPLACE VIEW rce_prices_today AS
+
+SELECT
+   q.quarters
+	,q.min_quarter_price
+	,q.avg_quarter_price
+	,q.max_quarter_price
+	,h.hours
+	,h.min_hour_price
+	,h.avg_hour_price
+	,h.max_hour_price
+FROM (
+	SELECT
+     JSON_OBJECTAGG(DATE_FORMAT(DATE_SUB(`dtime`, INTERVAL 15 MINUTE), '%H:%i'), ROUND(`rce_pln` / 1000, 2)) AS quarters
+		,ROUND(MIN(`rce_pln`) / 1000, 2) AS min_quarter_price
+		,ROUND(AVG(`rce_pln`) / 1000, 2) AS avg_quarter_price
+		,ROUND(MAX(`rce_pln`) / 1000, 2) AS max_quarter_price
+	FROM `rce_prices`
+	WHERE `business_date` = CURDATE()
+) q,
+(
+  SELECT
+     JSON_OBJECTAGG(LPAD(hour, 2, '0'), hour_price) AS hours
+    ,ROUND(MIN(hour_price), 2) AS min_hour_price
+    ,ROUND(AVG(hour_price), 2) AS avg_hour_price
+    ,ROUND(MAX(hour_price), 2) AS max_hour_price
+  FROM (
+    SELECT
+       HOUR(DATE_SUB(`dtime`, INTERVAL 15 MINUTE)) AS hour
+      ,ROUND(AVG(`rce_pln`) / 1000, 2) AS hour_price
+    FROM `rce_prices`
+    WHERE `business_date` = CURDATE()
+    GROUP BY HOUR(DATE_SUB(`dtime`, INTERVAL 15 MINUTE))
+  ) t
+) h;
+
+CREATE OR REPLACE VIEW rce_prices_tomorrow AS
+
+SELECT
+   q.quarters
+	,q.min_quarter_price
+	,q.avg_quarter_price
+	,q.max_quarter_price
+	,h.hours
+	,h.min_hour_price
+	,h.avg_hour_price
+	,h.max_hour_price
+FROM (
+	SELECT
+     JSON_OBJECTAGG(DATE_FORMAT(DATE_SUB(`dtime`, INTERVAL 15 MINUTE), '%H:%i'), ROUND(`rce_pln` / 1000, 2)) AS quarters
+		,ROUND(MIN(`rce_pln`) / 1000, 2) AS min_quarter_price
+		,ROUND(AVG(`rce_pln`) / 1000, 2) AS avg_quarter_price
+		,ROUND(MAX(`rce_pln`) / 1000, 2) AS max_quarter_price
+	FROM `rce_prices`
+	WHERE `business_date` = CURDATE()+1
+) q,
+(
+  SELECT
+     JSON_OBJECTAGG(LPAD(hour, 2, '0'), hour_price) AS hours
+    ,ROUND(MIN(hour_price), 2) AS min_hour_price
+    ,ROUND(AVG(hour_price), 2) AS avg_hour_price
+    ,ROUND(MAX(hour_price), 2) AS max_hour_price
+  FROM (
+    SELECT
+       HOUR(DATE_SUB(`dtime`, INTERVAL 15 MINUTE)) AS hour
+      ,ROUND(AVG(`rce_pln`) / 1000, 2) AS hour_price
+    FROM `rce_prices`
+    WHERE `business_date` = CURDATE()+1
+    GROUP BY HOUR(DATE_SUB(`dtime`, INTERVAL 15 MINUTE))
+  ) t
+) h;
+```
+
 Ustawienia -> Dodatki -> Sklep z dodatkami -> Grafana -> Zainstaluj
 
 Data Sources -> Add data source:
