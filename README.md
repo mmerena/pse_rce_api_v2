@@ -402,8 +402,21 @@ ORDER BY 1 DESC;
 Widoki dla SQL sensorów (Energy Management System):
 
 ```sql
-CREATE OR REPLACE VIEW rce_prices_today AS
+CREATE OR REPLACE VIEW tariff_supplier AS
+SELECT
+  'Tauron G13' AS name,
+  CAST(0.50 AS DECIMAL(5,2)) AS cheap_price,
+  CAST(0.80 AS DECIMAL(5,2)) AS normal_price,
+  7 AS normal_start_hour,
+  13 AS normal_end_hour,
+  CAST(1.20 AS DECIMAL(5,2)) AS peak_price,
+  16 AS peak_start_hour,
+  21 AS peak_end_hour,
+  TRUE AS weekend_cheap,
+  TRUE AS holiday_cheap;
 
+
+CREATE OR REPLACE VIEW rce_prices_today AS
 SELECT
    q.quarters
 	,q.min_quarter_price
@@ -439,7 +452,6 @@ FROM (
 ) h;
 
 CREATE OR REPLACE VIEW rce_prices_tomorrow AS
-
 SELECT
    q.quarters
 	,q.min_quarter_price
@@ -478,6 +490,15 @@ FROM (
 Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> SQL
 
 ```text
+sensor:
+  - platform: sql
+    db_url: !secret mariadb_url
+    queries:
+      - name: tariff_supplier 
+        query: >
+          SELECT * FROM `tariff_supplier `;
+        column: name
+
 sensor:
   - platform: sql
     db_url: !secret mariadb_url
