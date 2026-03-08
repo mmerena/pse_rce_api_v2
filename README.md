@@ -400,6 +400,7 @@ ORDER BY 1 DESC;
 ```
 
 Widoki dla SQL sensorów (Energy Management System):
+
 ```sql
 CREATE OR REPLACE VIEW rce_prices_today AS
 
@@ -472,6 +473,30 @@ FROM (
     GROUP BY HOUR(DATE_SUB(`dtime`, INTERVAL 15 MINUTE))
   ) t
 ) h;
+```
+
+Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> SQL
+
+```text
+sensor:
+  - platform: sql
+    db_url: !secret mariadb_url
+    queries:
+      - name: rce_prices_today
+        query: >
+          SELECT * FROM `rce_prices_today`;
+        column: avg_hour_price
+        unit_of_measurement: PLN/kWh
+
+sensor:
+  - platform: sql
+    db_url: !secret mariadb_url
+    queries:
+      - name: rce_prices_tomorrow
+        query: >
+          SELECT * FROM `rce_prices_tomorrow`;
+        column: avg_hour_price
+        unit_of_measurement: PLN/kWh
 ```
 
 Ustawienia -> Dodatki -> Sklep z dodatkami -> Grafana -> Zainstaluj
