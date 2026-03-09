@@ -402,7 +402,7 @@ ORDER BY 1 DESC;
 Widoki dla SQL sensorów (Energy Management System):
 
 ```sql
-CREATE VIEW IF NOT EXISTS tariff_supplier AS
+CREATE OR REPLACE VIEW tariff_supplier AS
 SELECT
     'G13' AS `name`,
     0.50 AS cheap_price,
