@@ -418,7 +418,7 @@ SELECT
 
 CREATE OR REPLACE VIEW rce_prices_today AS
 SELECT
-   q.quarters
+     q.quarters
 	,q.min_quarter_price
 	,q.avg_quarter_price
 	,q.max_quarter_price
@@ -453,7 +453,7 @@ FROM (
 
 CREATE OR REPLACE VIEW rce_prices_tomorrow AS
 SELECT
-   q.quarters
+     q.quarters
 	,q.min_quarter_price
 	,q.avg_quarter_price
 	,q.max_quarter_price
