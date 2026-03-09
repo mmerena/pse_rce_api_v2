@@ -520,6 +520,52 @@ sensor:
         unit_of_measurement: PLN/kWh
 ```
 
+Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> Workdays
+
+```yaml
+template:
+  - trigger:
+      - platform: time_pattern
+        minutes: "/1"
+    sensor:
+      - name: "Taryfa G13"
+        state: >
+          {% set hour = now().hour %}
+          {% set month = now().month %}
+          {% set workday = is_state('binary_sensor.workday_sensor','on') %}
+
+          {% set summer = month >= 4 and month <= 9 %}
+
+          {% if not workday %}
+            niska
+
+          {% else %}
+
+            {% if summer %}
+              {% if 13 <= hour < 19 %}
+                niska
+              {% elif 19 <= hour < 22 %}
+                wysoka
+              {% elif 7 <= hour < 13 %}
+                srednia
+              {% else %}
+                niska
+              {% endif %}
+            {% else %}
+              {% if 13 <= hour < 16 %}
+                niska
+              {% elif 16 <= hour < 21 %}
+                wysoka
+              {% elif 7 <= hour < 13 %}
+                srednia
+              {% else %}
+                niska
+              {% endif %}
+            {% endif %}
+
+          {% endif %}
+```
+
 Ustawienia -> Dodatki -> Sklep z dodatkami -> Grafana -> Zainstaluj
 
 Data Sources -> Add data source:
