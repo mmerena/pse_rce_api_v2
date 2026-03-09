@@ -404,16 +404,16 @@ Widoki dla SQL sensorów (Energy Management System):
 ```sql
 CREATE VIEW IF NOT EXISTS `tariff_supplier` AS
 SELECT
-  'G13' AS `name`,
-  0.50 AS cheap_price,
-  0.80 AS normal_price,
-  7 AS normal_start_hour,
-  13 AS normal_end_hour,
-  1.20 AS peak_price,
-  IF (month(CURDATE()) BETWEEN 4 AND 9, 19, 16) AS peak_start_hour,
-  IF (month(CURDATE()) BETWEEN 4 AND 9, 22, 21) AS peak_end_hour,
-  1 AS weekend_cheap,
-  1 AS holiday_cheap;
+    'G13' AS `name`,
+    0.50 AS cheap_price,
+    0.80 AS normal_price,
+    7 AS normal_start_hour,
+    13 AS normal_end_hour,
+    1.20 AS peak_price,
+    IF (month(CURDATE()) BETWEEN 4 AND 9, 19, 16) AS peak_start_hour,
+    IF (month(CURDATE()) BETWEEN 4 AND 9, 22, 21) AS peak_end_hour,
+    1 AS weekend_cheap,
+    1 AS holiday_cheap;
 
 
 CREATE OR REPLACE VIEW rce_prices_today AS
