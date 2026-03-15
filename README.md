@@ -517,7 +517,7 @@ sensor:
     queries:
       - name: local_supplier_tariff 
         query: >
-          SELECT * FROM `local_supplier_tariff `;
+          SELECT * FROM `local_supplier_tariff`;
         column: name
 
 sensor:
