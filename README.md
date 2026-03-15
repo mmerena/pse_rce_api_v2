@@ -402,7 +402,7 @@ ORDER BY 1 DESC;
 Widoki dla SQL sensorów (Energy Management System):
 
 ```sql
-CREATE OR REPLACE VIEW tariff_supplier AS
+CREATE OR REPLACE VIEW local_supplier_tariff AS
 SELECT
     'G13' AS `name`,
     0.50 AS cheap_price,
@@ -515,9 +515,9 @@ sensor:
   - platform: sql
     db_url: !secret mariadb_url
     queries:
-      - name: tariff_supplier 
+      - name: local_supplier_tariff 
         query: >
-          SELECT * FROM `tariff_supplier `;
+          SELECT * FROM `local_supplier_tariff `;
         column: name
 
 sensor:
