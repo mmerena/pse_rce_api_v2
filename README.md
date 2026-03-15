@@ -452,39 +452,49 @@ FROM (
 ) h;
 
 CREATE OR REPLACE VIEW rce_prices_tomorrow AS
-SELECT
-     q.quarters
-	,q.min_quarter_price
-	,q.avg_quarter_price
-	,q.max_quarter_price
-	,h.hours
-	,h.min_hour_price
-	,h.avg_hour_price
-	,h.max_hour_price
-FROM (
-	SELECT
-     JSON_OBJECTAGG(DATE_FORMAT(DATE_SUB(`dtime`, INTERVAL 15 MINUTE), '%H:%i'), ROUND(`rce_pln` / 1000, 2)) AS quarters
-		,ROUND(MIN(`rce_pln`) / 1000, 2) AS min_quarter_price
-		,ROUND(AVG(`rce_pln`) / 1000, 2) AS avg_quarter_price
-		,ROUND(MAX(`rce_pln`) / 1000, 2) AS max_quarter_price
-	FROM `rce_prices`
-	WHERE `business_date` = CURDATE()+1
-) q,
-(
-  SELECT
-     JSON_OBJECTAGG(LPAD(hour, 2, '0'), hour_price) AS hours
-    ,ROUND(MIN(hour_price), 2) AS min_hour_price
-    ,ROUND(AVG(hour_price), 2) AS avg_hour_price
-    ,ROUND(MAX(hour_price), 2) AS max_hour_price
-  FROM (
+WITH RECURSIVE quarters_series AS (
+    SELECT 0 AS minute_offset
+    UNION ALL
+    SELECT minute_offset + 15
+    FROM quarters_series
+    WHERE minute_offset < 24 * 60 - 15
+),
+quarters AS (
     SELECT
-       HOUR(DATE_SUB(`dtime`, INTERVAL 15 MINUTE)) AS hour
-      ,ROUND(AVG(`rce_pln`) / 1000, 2) AS hour_price
-    FROM `rce_prices`
-    WHERE `business_date` = CURDATE()+1
-    GROUP BY HOUR(DATE_SUB(`dtime`, INTERVAL 15 MINUTE))
-  ) t
-) h;
+        DATE_FORMAT(MAKETIME(FLOOR(qs.minute_offset / 60), qs.minute_offset % 60, 0), '%H:%i') AS quarter_time,
+        COALESCE(ROUND(rp.rce_pln / 1000, 2), 0) AS quarter_price
+    FROM quarters_series qs
+    LEFT JOIN homeassistant.rce_prices rp
+        ON DATE_FORMAT(rp.dtime - INTERVAL 15 MINUTE, '%H:%i') = DATE_FORMAT(MAKETIME(FLOOR(qs.minute_offset / 60), qs.minute_offset % 60, 0), '%H:%i')
+        AND rp.business_date = CURDATE() + 1
+),
+hours_series AS (
+    SELECT 0 AS hour_offset
+    UNION ALL
+    SELECT hour_offset + 1
+    FROM hours_series
+    WHERE hour_offset < 23
+),
+hours AS (
+    SELECT
+        LPAD(hs.hour_offset, 2, '0') AS hour_time,
+        COALESCE(ROUND(AVG(rp.rce_pln) / 1000, 2), 0) AS hour_price
+    FROM hours_series hs
+    LEFT JOIN homeassistant.rce_prices rp
+        ON HOUR(rp.dtime - INTERVAL 15 MINUTE) = hs.hour_offset
+        AND rp.business_date = CURDATE() + 1
+    GROUP BY hs.hour_offset
+)
+SELECT
+    (SELECT JSON_OBJECTAGG(quarter_time, quarter_price) FROM quarters) AS quarters,
+    ROUND((SELECT MIN(quarter_price) FROM quarters), 2) AS min_quarter_price,
+    ROUND((SELECT AVG(quarter_price) FROM quarters), 2) AS avg_quarter_price,
+    ROUND((SELECT MAX(quarter_price) FROM quarters), 2) AS max_quarter_price,
+    (SELECT JSON_OBJECTAGG(hour_time, hour_price) FROM hours) AS hours,
+    ROUND((SELECT MIN(hour_price) FROM hours), 2) AS min_hour_price,
+    ROUND((SELECT AVG(hour_price) FROM hours), 2) AS avg_hour_price,
+    ROUND((SELECT MAX(hour_price) FROM hours), 2) AS max_hour_price
+FROM (SELECT 1) AS dummy;
 ```
 
 Ustawienia -> Urządzenia oraz usługi -> Dodaj integrację -> SQL
